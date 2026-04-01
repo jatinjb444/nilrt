@@ -9,8 +9,8 @@ class JsonConfig:
     """Handles loading and validating the automation_conf.json
         configuration file."""
 
-    def __init__(self, automation_conf_path, work_item_id):
-        with open(automation_conf_path, "r", encoding="utf-8") as file:
+    def __init__(self, config_path, work_item_id):
+        with open(config_path, "r", encoding="utf-8") as file:
             config = json.load(file)
         self.work_item_id = work_item_id
         self.nilrt_branch = config.get("nilrt_branch")
@@ -27,3 +27,27 @@ class JsonConfig:
         self.log_level = config.get("log_level")
         self.build_args = config.get("build_args", "")
         self.rt_target_IP = config.get("rt_target_IP")
+        
+        # Kernel build configuration (optional section)
+        kernel_config = config.get("kernel_build", {})
+        # Expand environment variables in paths
+        self.kernel_src_dir = self._expand_path(kernel_config.get("kernel_src_dir"))
+        self.kernel_target_host = kernel_config.get("target_host")
+        self.kernel_target_user = kernel_config.get("target_user")
+        self.arch = kernel_config.get("arch")
+        self.temp_modules_dir = self._expand_path(kernel_config.get("temp_modules_dir"))
+        self.toolchain_prefix = self._expand_path(kernel_config.get("toolchain_prefix"))
+        self.merge_workdir = self._expand_path(kernel_config.get("merge_workdir"))
+        self.target_branch = kernel_config.get("target_branch")
+        self.stable_rt_remote = kernel_config.get("stable_rt_remote")
+        self.nilrt_root = self._expand_path(kernel_config.get("nilrt_root"))
+        self.required_packages = kernel_config.get("required_packages", [])
+        self.make_jobs = kernel_config.get("make_jobs", "$(nproc)")
+        self.kernel_config = kernel_config.get("kernel_config", "defconfig")
+        self.repo_url = kernel_config.get("repo_url")
+    
+    def _expand_path(self, path):
+        """Expand environment variables and user home directory in paths."""
+        if path:
+            return os.path.expandvars(os.path.expanduser(path))
+        return path
