@@ -22,6 +22,7 @@
     "toolchain_prefix": "",
     "ssh_target": "",   
     "build_host_ip": "",
+    "build_user": "",
     "work_item_id": ""
     }
 }

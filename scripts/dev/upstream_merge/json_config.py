@@ -47,9 +47,7 @@ class JsonConfig:
         self.build_host_ip = kernel_config.get("build_host_ip")
         self.ssh_options = kernel_config.get(
             "ssh_options", "-o StrictHostKeyChecking=no")
-        self.build_host_user = kernel_config.get(
-            "build_host_user", os.getenv("USER", "builduser"))
-        self.pr_enabled = config.get("pr_enabled", False)
+        self.build_user = kernel_config.get("build_user")
         self.pr_target_branch = config.get(
             "pr_target_branch", self.target_branch)
         self.work_item_id = work_item_id or config.get("work_item_id", "")

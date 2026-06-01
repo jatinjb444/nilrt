@@ -4,6 +4,7 @@ import sys
 import re
 import argparse
 import time
+import getpass
 from log_and_email_utils import setup_logging, write_log_and_send_email
 from utils import build
 from utils.git_commands import (
@@ -91,7 +92,59 @@ def run_cmd(cmd):
         return 1, output
     return 0, output
 
+def setup_passwordless_ssh_to_build_machine(build_host_ip, build_user):
+    """
+    Setup passwordless SSH from target → build machine
+    """
 
+    print("[SSH-SETUP] Setting up passwordless SSH (target → build machine)")
+
+    # Step 1: Generate key on target (if not exists)
+    rc = os.system(
+        f"ssh {config.ssh_target} "
+        "\"[ -f ~/.ssh/id_rsa ] || ssh-keygen -t rsa -b 4096 -N '' -f ~/.ssh/id_rsa\""
+    )
+    if rc != 0:
+        print("[ERROR] Failed to generate SSH key on target")
+        return 1
+
+    # Step 2: Fetch public key from target
+    key = os.popen(
+        f'ssh {config.ssh_target} "cat ~/.ssh/id_rsa.pub"'
+    ).read().strip()
+
+    if not key:
+        print("[ERROR] Failed to retrieve public key from target")
+        return 1
+
+    # Step 3: Add key to build machine
+    # Step 3: Add key locally (NO SSH needed ✅)
+
+    ssh_dir = os.path.expanduser("~/.ssh")
+    auth_file = os.path.join(ssh_dir, "authorized_keys")
+
+    os.makedirs(ssh_dir, exist_ok=True)
+    os.chmod(ssh_dir, 0o700)
+
+    # Read existing keys
+    existing_keys = []
+    if os.path.exists(auth_file):
+        with open(auth_file, "r") as f:
+            existing_keys = f.read().splitlines()
+
+    # Add key only if not present
+    if key not in existing_keys:
+        with open(auth_file, "a") as f:
+            f.write(key + "\n")
+
+        print("[SSH-SETUP] Key added to authorized_keys")
+    else:
+        print("[SSH-SETUP] Key already present")
+
+    os.chmod(auth_file, 0o600)
+    print("[SSH-SETUP] Passwordless SSH setup complete")
+
+    return 0
 # --------------------
 # Kernel repo handling
 # --------------------
@@ -179,7 +232,22 @@ def create_kernel_pr(args, config, latest_tag, defconfig_changed):
 def run_upstream_merge_script(args):
     original_cwd = os.getcwd()
     print("[INFO] Running upstream RT merge")
+    build_user = (
+        config.build_user
+        if config.build_user
+        else os.getenv("BUILD_USER", getpass.getuser())
+    )
 
+    print(f"[INFO] Using build user: {build_user}")
+
+    ssh_setup_rc = setup_passwordless_ssh_to_build_machine(
+        config.build_host_ip,
+        build_user
+    )
+    if ssh_setup_rc != 0:
+        print("[ERROR] Passwordless SSH setup failed")
+        return
+    
     clone_kernel_repository()
 
     kernel_repo = GitRepo(
